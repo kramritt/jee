@@ -1,50 +1,40 @@
 
-const { Client, GatewayIntentBits, ChannelType } = require("discord.js");
+const { Client, GatewayIntentBits } = require("discord.js");
 const { joinVoiceChannel } = require("@discordjs/voice");
-const fs = require("fs");
+require("dotenv").config();
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
 });
 
-const LAST_VC_FILE = "last_vc.txt";
-const TOKEN = process.env.TOKEN;
+let lastVC = null;
 
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
-  
-  if (fs.existsSync(LAST_VC_FILE)) {
-    const lastVC = fs.readFileSync(LAST_VC_FILE, "utf8");
-    const [guildId, channelId] = lastVC.split(",");
-    const guild = client.guilds.cache.get(guildId);
-    const channel = guild?.channels.cache.get(channelId);
-    
-    if (channel && channel.type === ChannelType.GuildVoice) {
-      joinVC(channel);
-    }
-  }
+  if (lastVC) joinVC(lastVC);
 });
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
-
   if (interaction.commandName === "join") {
     if (!interaction.member.voice.channel) {
-      return interaction.reply("join a vc first");
+      return interaction.reply("You need to be in a voice channel!");
     }
-
-    joinVC(interaction.member.voice.channel);
-    fs.writeFileSync(LAST_VC_FILE, `${interaction.guild.id},${interaction.member.voice.channel.id}`);
-    interaction.reply("joined vc");
+    lastVC = interaction.member.voice.channel.id;
+    joinVC(lastVC);
+    interaction.reply("Joined voice channel!");
   }
 });
 
-function joinVC(channel) {
+function joinVC(channelId) {
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) return;
   joinVoiceChannel({
     channelId: channel.id,
     guildId: channel.guild.id,
     adapterCreator: channel.guild.voiceAdapterCreator,
+    selfDeaf: false,
   });
 }
 
-client.login(TOKEN);
+client.login(process.env.TOKEN);
